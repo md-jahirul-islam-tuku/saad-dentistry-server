@@ -33,9 +33,9 @@ function verifyJWT(req, res, next) {
 
 async function run() {
   try {
-    const Services = client.db("saadDentistry").collection("services");
-    const Reviews = client.db("saadDentistry").collection("reviews");
-    const Doctors = client.db("saadDentistry").collection("doctors");
+    const Doctors = client.db("dentistryDB").collection("lalumia");
+    const Services = client.db("dentistryDB").collection("services");
+    const Reviews = client.db("dentistryDB").collection("reviews");
     app.post("/jwt", (req, res) => {
       const user = req.body;
       const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
@@ -48,7 +48,7 @@ async function run() {
       const services = await cursor.toArray();
       res.send(services);
     });
-    app.get("/doctors", async (req, res) => {
+    app.get("/lalumia", async (req, res) => {
       const cursor = Doctors.find({});
       const doctors = await cursor.toArray();
       res.send(doctors);
@@ -59,7 +59,7 @@ async function run() {
       const service = await Services.findOne(query);
       res.send(service);
     });
-    app.get("/reviews", verifyJWT, async (req, res) => {
+    app.get("/reviews", async (req, res) => {
       const decoded = req.decoded;
       if (decoded.email !== req.query.email) {
         res.status(403).send({ message: "unauthorized access" });
@@ -108,6 +108,11 @@ async function run() {
     app.post("/services", async (req, res) => {
       const service = req.body;
       const result = await Services.insertOne(service);
+      res.send(result);
+    });
+    app.post("/lalumia", async (req, res) => {
+      const doctor = req.body;
+      const result = await Doctors.insertOne(doctor);
       res.send(result);
     });
     app.post("/reviews", async (req, res) => {
