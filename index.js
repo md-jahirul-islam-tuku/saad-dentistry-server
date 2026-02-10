@@ -111,8 +111,23 @@ async function run() {
       res.send(result);
     });
     app.post("/lalumia", async (req, res) => {
-      const doctor = req.body;
+      const doctor = {
+        ...req.body,
+        permission: "pending",
+        createdAt: new Date(), // optional but recommended
+      };
+
       const result = await Doctors.insertOne(doctor);
+      res.send(result);
+    });
+    app.patch("/lalumia/:id/approve", async (req, res) => {
+      const id = req.params.id;
+
+      const result = await Doctors.updateOne(
+        { _id: new ObjectId(id) },
+        { $set: { permission: "approved" } },
+      );
+
       res.send(result);
     });
     app.post("/reviews", async (req, res) => {
