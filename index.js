@@ -59,7 +59,7 @@ async function run() {
       const service = await Services.findOne(query);
       res.send(service);
     });
-    app.get("/reviews", async (req, res) => {
+    app.get("/reviews", verifyJWT, async (req, res) => {
       const decoded = req.decoded;
       if (decoded.email !== req.query.email) {
         res.status(403).send({ message: "unauthorized access" });
@@ -126,6 +126,16 @@ async function run() {
       const result = await Doctors.updateOne(
         { _id: new ObjectId(id) },
         { $set: { permission: "approved" } },
+      );
+
+      res.send(result);
+    });
+    app.patch("/lalumia/:id/reject", async (req, res) => {
+      const id = req.params.id;
+
+      const result = await Doctors.updateOne(
+        { _id: new ObjectId(id) },
+        { $set: { permission: "rejected" } },
       );
 
       res.send(result);
