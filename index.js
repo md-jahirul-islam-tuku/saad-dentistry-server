@@ -171,6 +171,44 @@ app.get("/users/:email", async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+app.get("/users", async (req, res) => {
+  try {
+    const users = await usersCollection.find({}).toArray();
+
+    if (!users) {
+      return res.status(404).json({ message: "There have no users" });
+    }
+
+    res.json({
+      success: true,
+      data: users,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+app.patch("/user/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+    const { role } = req.body;
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).send({ error: "Invalid ID" });
+    }
+    const userUpdate = await usersCollection.updateOne(
+      { _id: new ObjectId(id) },
+      {
+        $set: { role },
+      },
+    );
+    res.send({
+      modifiedCount: userUpdate.modifiedCount,
+      message: "Role updated successfully",
+    });
+  } catch (error) {
+    console.error("Update Error:", error);
+    res.status(500).send({ error: "Server Error" });
+  }
+});
 
 app.post("/services", async (req, res) => {
   const result = await Services.insertOne(req.body);
@@ -208,12 +246,34 @@ app.patch("/lalumia/:id", async (req, res) => {
       return res.status(400).send({ error: "Invalid permission value" });
     }
 
-    const result = await Doctors.updateOne(
+    // 1️⃣ Find doctor first
+    const doctor = await Doctors.findOne({
+      _id: new ObjectId(id),
+    });
+
+    if (!doctor) {
+      return res.status(404).send({ error: "Doctor not found" });
+    }
+
+    // 2️⃣ Update doctor permission
+    const doctorUpdate = await Doctors.updateOne(
       { _id: new ObjectId(id) },
       { $set: { permission } },
     );
 
-    res.send(result);
+    // 3️⃣ Update user role based on permission
+    const newRole = permission === "approved" ? "doctor" : "user";
+
+    const userUpdate = await usersCollection.updateOne(
+      { email: doctor.email },
+      { $set: { role: newRole, roleUpdateAt: new Date() } },
+    );
+
+    res.send({
+      doctorUpdate,
+      userUpdate,
+      message: "Permission & role updated successfully",
+    });
   } catch (error) {
     console.error("Update Error:", error);
     res.status(500).send({ error: "Server Error" });
