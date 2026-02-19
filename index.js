@@ -37,10 +37,11 @@ connectDB();
 ======================== */
 
 const database = client.db("dentistryDB");
-const Doctors = database.collection("lalumia");
+const Doctors = database.collection("doctors-all");
 const Services = database.collection("services");
 const Reviews = database.collection("reviews");
-const usersCollection = database.collection("users");
+const Users = database.collection("users");
+const Appointments = database.collection("appointments");
 
 /* ========================
    JWT Middleware
@@ -109,7 +110,7 @@ app.post("/users", async (req, res) => {
       return res.status(400).json({ message: "Email is required" });
     }
 
-    const existingUser = await usersCollection.findOne({ email });
+    const existingUser = await Users.findOne({ email });
 
     if (!existingUser) {
       // 🆕 New user (REGISTER)
@@ -122,7 +123,7 @@ app.post("/users", async (req, res) => {
         lastLoginAt: new Date(),
       };
 
-      await usersCollection.insertOne(newUser);
+      await Users.insertOne(newUser);
 
       return res.json({
         success: true,
@@ -131,7 +132,7 @@ app.post("/users", async (req, res) => {
       });
     } else {
       // 🔁 Existing user (LOGIN)
-      await usersCollection.updateOne(
+      await Users.updateOne(
         { email },
         {
           $set: {
@@ -153,11 +154,25 @@ app.post("/users", async (req, res) => {
   }
 });
 
+app.post("/appointment", async (req, res) => {
+  try {
+    const data = req.body;
+    const { doctorName, doctorEmail } = data;
+    if (!doctorName && !doctorEmail) {
+      return res.status(400).json({ message: "Doctor name is required" });
+    }
+    const result = await Appointments.insertOne(data);
+    res.send(result);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 app.get("/users/:email", async (req, res) => {
   try {
     const { email } = req.params;
 
-    const user = await usersCollection.findOne({ email });
+    const user = await Users.findOne({ email });
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
@@ -173,7 +188,7 @@ app.get("/users/:email", async (req, res) => {
 });
 app.get("/users", async (req, res) => {
   try {
-    const users = await usersCollection.find({}).toArray();
+    const users = await Users.find({}).toArray();
 
     if (!users) {
       return res.status(404).json({ message: "There have no users" });
@@ -194,9 +209,9 @@ app.patch("/user/:id", async (req, res) => {
     if (!ObjectId.isValid(id)) {
       return res.status(400).send({ error: "Invalid ID" });
     }
-    const user = await usersCollection.findOne({ _id: new ObjectId(id) });
+    const user = await Users.findOne({ _id: new ObjectId(id) });
     if (user.role === "admin" && role !== "admin") {
-      const adminCount = await usersCollection.countDocuments({
+      const adminCount = await Users.countDocuments({
         role: "admin",
       });
       if (adminCount <= 1) {
@@ -205,7 +220,7 @@ app.patch("/user/:id", async (req, res) => {
         });
       }
     }
-    const userUpdate = await usersCollection.updateOne(
+    const userUpdate = await Users.updateOne(
       { _id: new ObjectId(id) },
       {
         $set: { role },
@@ -226,14 +241,37 @@ app.post("/services", async (req, res) => {
   res.send(result);
 });
 
-/* ========= Doctors (Lalumia) ========= */
+// server.js or routes file
 
-app.get("/lalumia", async (req, res) => {
+app.put("/services/:id", async (req, res) => {
+  const id = req.params.id;
+  const updatedData = req.body;
+
+  const filter = { _id: new ObjectId(id) };
+
+  const updateDoc = {
+    $set: {
+      title: updatedData.title,
+      img: updatedData.img,
+      rating: updatedData.rating,
+      price: updatedData.price,
+      description: updatedData.description,
+    },
+  };
+
+  const result = await Services.updateOne(filter, updateDoc);
+
+  res.send(result);
+});
+
+/* ========= Doctors (doctors-all) ========= */
+
+app.get("/doctors-all", async (req, res) => {
   const doctors = await Doctors.find({}).toArray();
   res.send(doctors);
 });
 
-app.post("/lalumia", async (req, res) => {
+app.post("/doctors-all", async (req, res) => {
   const doctor = {
     ...req.body,
     permission: "pending",
@@ -244,7 +282,7 @@ app.post("/lalumia", async (req, res) => {
   res.send(result);
 });
 
-app.patch("/lalumia/:id", async (req, res) => {
+app.patch("/doctors-all/:id", async (req, res) => {
   try {
     const id = req.params.id;
     const { permission } = req.body;
@@ -275,7 +313,7 @@ app.patch("/lalumia/:id", async (req, res) => {
     // 3️⃣ Update user role based on permission
     const newRole = permission === "approved" ? "doctor" : "user";
 
-    const userUpdate = await usersCollection.updateOne(
+    const userUpdate = await Users.updateOne(
       { email: doctor.email },
       { $set: { role: newRole, roleUpdateAt: new Date() } },
     );
