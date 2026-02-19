@@ -194,6 +194,17 @@ app.patch("/user/:id", async (req, res) => {
     if (!ObjectId.isValid(id)) {
       return res.status(400).send({ error: "Invalid ID" });
     }
+    const user = await usersCollection.findOne({ _id: new ObjectId(id) });
+    if (user.role === "admin" && role !== "admin") {
+      const adminCount = await usersCollection.countDocuments({
+        role: "admin",
+      });
+      if (adminCount <= 1) {
+        return res.status(400).send({
+          error: "At least one admin must remain in the system",
+        });
+      }
+    }
     const userUpdate = await usersCollection.updateOne(
       { _id: new ObjectId(id) },
       {
