@@ -168,6 +168,33 @@ app.post("/appointment", async (req, res) => {
   }
 });
 
+app.get("/appointments", async (req, res) => {
+  try {
+    const { role, email } = req.query;
+
+    let query = {};
+
+    if (role === "user") {
+      query = { email: email };
+    }
+
+    if (role === "doctor") {
+      query = { doctorEmail: email };
+    }
+
+    // admin হলে query empty থাকবে → সব দেখাবে
+
+    const result = await Appointments.find(query).toArray();
+
+    res.status(200).json(result);
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to fetch appointments",
+      error: error.message,
+    });
+  }
+});
+
 app.get("/users/:email", async (req, res) => {
   try {
     const { email } = req.params;
@@ -202,6 +229,27 @@ app.get("/users", async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+app.get("/users/check/:email", async (req, res) => {
+  try {
+    const email = req.params.email;
+
+    const existingUser = await Users.findOne({ email });
+
+    if (existingUser) {
+      return res.status(409).json({
+        message: "Email already registered. Please login.",
+      });
+    }
+
+    res.status(200).json({ message: "Email available" });
+  } catch (error) {
+    res.status(500).json({
+      message: "Server error",
+      error: error.message,
+    });
+  }
+});
+
 app.patch("/user/:id", async (req, res) => {
   try {
     const id = req.params.id;
