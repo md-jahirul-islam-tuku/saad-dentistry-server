@@ -137,8 +137,6 @@ app.post("/users", async (req, res) => {
         {
           $set: {
             lastLoginAt: new Date(),
-            name,
-            photoURL,
           },
         },
       );
@@ -181,9 +179,6 @@ app.get("/appointments", async (req, res) => {
     if (role === "doctor") {
       query = { doctorEmail: email };
     }
-
-    // admin হলে query empty থাকবে → সব দেখাবে
-
     const result = await Appointments.find(query).toArray();
 
     res.status(200).json(result);
@@ -191,6 +186,31 @@ app.get("/appointments", async (req, res) => {
     res.status(500).json({
       message: "Failed to fetch appointments",
       error: error.message,
+    });
+  }
+});
+
+app.delete("/appointment/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await Appointments.deleteOne({ _id: new ObjectId(id) });
+
+    if (result.deletedCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Appointment not found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Appointment deleted successfully",
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Server error",
     });
   }
 });
@@ -282,6 +302,20 @@ app.patch("/user/:id", async (req, res) => {
     console.error("Update Error:", error);
     res.status(500).send({ error: "Server Error" });
   }
+});
+
+app.delete("/user/:id", verifyJWT, async (req, res) => {
+  const id = req.params.id;
+
+  if (!ObjectId.isValid(id)) {
+    return res.status(400).send({ error: "Invalid ID" });
+  }
+
+  const result = await Users.deleteOne({
+    _id: new ObjectId(id),
+  });
+
+  res.send(result);
 });
 
 app.post("/services", async (req, res) => {
