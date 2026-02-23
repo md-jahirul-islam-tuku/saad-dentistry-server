@@ -1,4 +1,5 @@
 const express = require("express");
+const Stripe = require("stripe");
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
@@ -9,6 +10,8 @@ const port = process.env.PORT || 5000;
 
 app.use(cors());
 app.use(express.json());
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 /* ========================
    MongoDB Connection
@@ -42,6 +45,7 @@ const Services = database.collection("services");
 const Reviews = database.collection("reviews");
 const Users = database.collection("users");
 const Appointments = database.collection("appointments");
+const Payments = database.collection("payments");
 
 /* ========================
    JWT Middleware
@@ -159,7 +163,10 @@ app.post("/appointment", async (req, res) => {
     if (!doctorName && !doctorEmail) {
       return res.status(400).json({ message: "Doctor name is required" });
     }
-    const result = await Appointments.insertOne(data);
+    const result = await Appointments.insertOne({
+      ...data,
+      paymentStatus: "unpaid",
+    });
     res.send(result);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -187,6 +194,137 @@ app.get("/appointments", async (req, res) => {
       message: "Failed to fetch appointments",
       error: error.message,
     });
+  }
+});
+
+app.get("/appointment/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).send({ error: "Invalid ID" });
+    }
+
+    const appointment = await Appointments.findOne({ _id: new ObjectId(id) });
+    res.send(appointment);
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to fetch appointments",
+      error: error.message,
+    });
+  }
+});
+
+// POST: Pay to stripe
+app.post("/create-payment-intent", async (req, res) => {
+  try {
+    const { serviceId, customerName, customerEmail } = req.body;
+
+    if (!serviceId) {
+      return res.status(400).json({ message: "Service ID is required" });
+    }
+
+    // 🔐 Always calculate price from DB (Never trust frontend)
+    const service = await Services.findOne({
+      _id: new ObjectId(serviceId),
+    });
+
+    if (!service) {
+      return res.status(404).json({ message: "Service not found" });
+    }
+
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: service.price * 100, // convert to cents
+      currency: "usd",
+      automatic_payment_methods: {
+        enabled: true,
+      },
+      metadata: {
+        serviceId: service._id.toString(),
+        serviceTitle: service.title,
+        customerName,
+        customerEmail,
+      },
+    });
+
+    res.send({
+      clientSecret: paymentIntent.client_secret,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+// POST: Add Parcel
+app.post("/payments", async (req, res) => {
+  try {
+    const { appointmentId, paymentIntentId, customerEmail, customerName } =
+      req.body;
+
+    // 🔎 Validate appointmentId
+    if (!ObjectId.isValid(appointmentId)) {
+      return res.status(400).json({ message: "Invalid appointment ID" });
+    }
+
+    // 🔍 Find appointment
+    const appointment = await Appointments.findOne({
+      _id: new ObjectId(appointmentId),
+    });
+
+    if (!appointment) {
+      return res.status(404).json({ message: "Appointment not found" });
+    }
+
+    // ❌ Prevent duplicate payment
+    if (appointment.paymentStatus === "paid") {
+      return res.status(400).json({ message: "Appointment already paid" });
+    }
+
+    // 🔐 Always get price from DB (never trust frontend)
+    const service = await Services.findOne({
+      _id: new ObjectId(appointment.serviceId),
+    });
+
+    if (!service) {
+      return res.status(404).json({ message: "Service not found" });
+    }
+
+    const amount = service.price;
+
+    // 1️⃣ Save payment history
+    const paymentDoc = {
+      appointmentId: new ObjectId(appointmentId),
+      serviceId: service._id,
+      serviceTitle: service.title,
+      amount,
+      currency: "usd",
+      paymentIntentId,
+      transactionId: paymentIntentId,
+      customerName,
+      customerEmail,
+      status: "succeeded",
+      createdAt: new Date(),
+    };
+
+    await Payments.insertOne(paymentDoc);
+
+    // 2️⃣ Update appointment status
+    await Appointments.updateOne(
+      { _id: new ObjectId(appointmentId) },
+      {
+        $set: {
+          paymentStatus: "paid",
+          transactionId: paymentIntentId,
+          paidAt: new Date(),
+        },
+      },
+    );
+
+    res.status(201).json({
+      success: true,
+      message: "Payment stored successfully",
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
 });
 
