@@ -1,3 +1,13 @@
+/**
+ * =========================================================
+ * SaaD Dentistry Backend Server
+ * =========================================================
+ * Author: Md Jahirul Islam Tuku
+ * Description: Dental Appointment & Payment System API
+ * Tech Stack: Node.js, Express, MongoDB, JWT, Stripe
+ * =========================================================
+ */
+
 const express = require("express");
 const Stripe = require("stripe");
 const cors = require("cors");
@@ -5,47 +15,65 @@ const jwt = require("jsonwebtoken");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 require("dotenv").config();
 
+/* ========================
+   App Initialization
+======================== */
+
 const app = express();
 const port = process.env.PORT || 5000;
+
+/* ========================
+   Global Middlewares
+======================== */
 
 app.use(cors());
 app.use(express.json());
 
+/* ========================
+   Stripe Configuration
+======================== */
+
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 /* ========================
-   MongoDB Connection
+   MongoDB Configuration
 ======================== */
 
-const uri = process.env.MONGODB_URI;
-
-const client = new MongoClient(uri, {
+const client = new MongoClient(process.env.MONGODB_URI, {
   serverApi: ServerApiVersion.v1,
 });
 
-async function connectDB() {
+/* ========================
+   Database & Collections
+======================== */
+
+let db;
+let Doctors, Services, Reviews, Users, Appointments, Payments;
+
+/* ========================
+   Connect to MongoDB
+======================== */
+
+async function connectDatabase() {
   try {
     await client.connect();
-    console.log("✅ MongoDB connected successfully");
+    db = client.db("dentistryDB");
+
+    Doctors = db.collection("doctors-all");
+    Services = db.collection("services");
+    Reviews = db.collection("reviews");
+    Users = db.collection("users");
+    Appointments = db.collection("appointments");
+    Payments = db.collection("payments");
+
+    console.log("✅ MongoDB Connected Successfully");
   } catch (error) {
-    console.error("❌ MongoDB connection failed:", error);
+    console.error("❌ MongoDB Connection Failed:", error);
     process.exit(1);
   }
 }
 
-connectDB();
-
-/* ========================
-   Database Collections
-======================== */
-
-const database = client.db("dentistryDB");
-const Doctors = database.collection("doctors-all");
-const Services = database.collection("services");
-const Reviews = database.collection("reviews");
-const Users = database.collection("users");
-const Appointments = database.collection("appointments");
-const Payments = database.collection("payments");
+connectDatabase();
 
 /* ========================
    JWT Middleware
@@ -87,7 +115,9 @@ app.post("/jwt", (req, res) => {
   res.send({ token });
 });
 
-/* ========= Services ========= */
+/* ========================
+   Services
+======================== */
 
 app.get("/services", async (req, res) => {
   const services = await Services.find({}).toArray();
@@ -105,56 +135,36 @@ app.get("/services/:id", async (req, res) => {
   res.send(service);
 });
 
-// users post
-app.post("/users", async (req, res) => {
-  try {
-    const { name, email, photoURL } = req.body;
-
-    if (!email) {
-      return res.status(400).json({ message: "Email is required" });
-    }
-
-    const existingUser = await Users.findOne({ email });
-
-    if (!existingUser) {
-      // 🆕 New user (REGISTER)
-      const newUser = {
-        name,
-        email,
-        photoURL,
-        role: "user",
-        createdAt: new Date(),
-        lastLoginAt: new Date(),
-      };
-
-      await Users.insertOne(newUser);
-
-      return res.json({
-        success: true,
-        message: "User created",
-        type: "register",
-      });
-    } else {
-      // 🔁 Existing user (LOGIN)
-      await Users.updateOne(
-        { email },
-        {
-          $set: {
-            lastLoginAt: new Date(),
-          },
-        },
-      );
-
-      return res.json({
-        success: true,
-        message: "Login time updated",
-        type: "login",
-      });
-    }
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
+app.post("/services", async (req, res) => {
+  const result = await Services.insertOne(req.body);
+  res.send(result);
 });
+
+
+app.put("/services/:id", async (req, res) => {
+  const id = req.params.id;
+  const updatedData = req.body;
+
+  const filter = { _id: new ObjectId(id) };
+
+  const updateDoc = {
+    $set: {
+      title: updatedData.title,
+      img: updatedData.img,
+      rating: updatedData.rating,
+      price: updatedData.price,
+      description: updatedData.description,
+    },
+  };
+
+  const result = await Services.updateOne(filter, updateDoc);
+
+  res.send(result);
+});
+
+/* ========================
+   Users appointments
+======================== */
 
 app.post("/appointment", async (req, res) => {
   try {
@@ -197,6 +207,31 @@ app.get("/appointments", async (req, res) => {
   }
 });
 
+app.delete("/appointment/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await Appointments.deleteOne({ _id: new ObjectId(id) });
+
+    if (result.deletedCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Appointment not found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Appointment deleted successfully",
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
+});
+
 app.get("/appointment/:id", async (req, res) => {
   try {
     const { id } = req.params;
@@ -215,7 +250,10 @@ app.get("/appointment/:id", async (req, res) => {
   }
 });
 
-// POST: Pay to stripe
+/* ========================
+   Pay to stripe
+======================== */
+
 app.post("/create-payment-intent", async (req, res) => {
   try {
     const { serviceId, customerName, customerEmail } = req.body;
@@ -254,7 +292,11 @@ app.post("/create-payment-intent", async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
-// POST: Add Parcel
+
+/* ====================================
+   Save Payment & Update Appointment
+==================================== */
+
 app.post("/payments", async (req, res) => {
   try {
     const { appointmentId, paymentIntentId, customerEmail, customerName } =
@@ -328,28 +370,57 @@ app.post("/payments", async (req, res) => {
   }
 });
 
-app.delete("/appointment/:id", async (req, res) => {
+/* ========================
+   Users
+======================== */
+
+app.post("/users", async (req, res) => {
   try {
-    const { id } = req.params;
+    const { name, email, photoURL } = req.body;
 
-    const result = await Appointments.deleteOne({ _id: new ObjectId(id) });
-
-    if (result.deletedCount === 0) {
-      return res.status(404).json({
-        success: false,
-        message: "Appointment not found",
-      });
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
     }
 
-    res.status(200).json({
-      success: true,
-      message: "Appointment deleted successfully",
-    });
+    const existingUser = await Users.findOne({ email });
+
+    if (!existingUser) {
+      // 🆕 New user (REGISTER)
+      const newUser = {
+        name,
+        email,
+        photoURL,
+        role: "user",
+        createdAt: new Date(),
+        lastLoginAt: new Date(),
+      };
+
+      await Users.insertOne(newUser);
+
+      return res.json({
+        success: true,
+        message: "User created",
+        type: "register",
+      });
+    } else {
+      // 🔁 Existing user (LOGIN)
+      await Users.updateOne(
+        { email },
+        {
+          $set: {
+            lastLoginAt: new Date(),
+          },
+        },
+      );
+
+      return res.json({
+        success: true,
+        message: "Login time updated",
+        type: "login",
+      });
+    }
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: "Server error",
-    });
+    res.status(500).json({ message: error.message });
   }
 });
 
@@ -371,6 +442,7 @@ app.get("/users/:email", async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+
 app.get("/users", async (req, res) => {
   try {
     const users = await Users.find({}).toArray();
@@ -387,6 +459,7 @@ app.get("/users", async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+
 app.get("/users/check/:email", async (req, res) => {
   try {
     const email = req.params.email;
@@ -456,35 +529,9 @@ app.delete("/user/:id", verifyJWT, async (req, res) => {
   res.send(result);
 });
 
-app.post("/services", async (req, res) => {
-  const result = await Services.insertOne(req.body);
-  res.send(result);
-});
-
-// server.js or routes file
-
-app.put("/services/:id", async (req, res) => {
-  const id = req.params.id;
-  const updatedData = req.body;
-
-  const filter = { _id: new ObjectId(id) };
-
-  const updateDoc = {
-    $set: {
-      title: updatedData.title,
-      img: updatedData.img,
-      rating: updatedData.rating,
-      price: updatedData.price,
-      description: updatedData.description,
-    },
-  };
-
-  const result = await Services.updateOne(filter, updateDoc);
-
-  res.send(result);
-});
-
-/* ========= Doctors (doctors-all) ========= */
+/* ========================
+   Doctors (doctors-all)
+======================== */
 
 app.get("/doctors-all", async (req, res) => {
   const doctors = await Doctors.find({}).toArray();
@@ -549,7 +596,9 @@ app.patch("/doctors-all/:id", async (req, res) => {
   }
 });
 
-/* ========= Reviews ========= */
+/* ========================
+   Reviews
+======================== */
 
 app.get("/reviews", verifyJWT, async (req, res) => {
   const decoded = req.decoded;
