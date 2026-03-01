@@ -26,8 +26,28 @@ const port = process.env.PORT || 5000;
    Global Middlewares
 ======================== */
 
-app.use(cors());
+// app.use(cors());
+
+app.use(
+  cors({
+    origin: ["http://localhost:5173", "https://your-frontend-name.vercel.app"],
+    credentials: true,
+  }),
+);
+
 app.use(express.json());
+
+const helmet = require("helmet");
+app.use(helmet());
+
+const rateLimit = require("express-rate-limit");
+
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+});
+
+app.use(limiter);
 
 /* ========================
    Stripe Configuration
@@ -73,8 +93,6 @@ async function connectDatabase() {
   }
 }
 
-connectDatabase();
-
 /* ========================
    JWT Middleware
 ======================== */
@@ -101,15 +119,18 @@ function verifyJWT(req, res, next) {
    Routes
 ======================== */
 
+const asyncHandler = (fn) => (req, res, next) =>
+  Promise.resolve(fn(req, res, next)).catch(next);
+
 // Root
 app.get("/", (req, res) => {
   res.send("SaaD Dentistry server is running...");
 });
 
 // JWT
-app.post("/jwt", (req, res) => {
-  const user = req.body;
-  const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
+app.post("/jwt", limiter, (req, res) => {
+  const { email } = req.body;
+  const token = jwt.sign({ email }, process.env.ACCESS_TOKEN_SECRET, {
     expiresIn: "40d",
   });
   res.send({ token });
@@ -119,10 +140,13 @@ app.post("/jwt", (req, res) => {
    Services
 ======================== */
 
-app.get("/services", async (req, res) => {
-  const services = await Services.find({}).toArray();
-  res.send(services);
-});
+app.get(
+  "/services",
+  asyncHandler(async (req, res) => {
+    const services = await Services.find({}).toArray();
+    res.send(services);
+  }),
+);
 
 app.get("/services/:id", async (req, res) => {
   const id = req.params.id;
@@ -139,7 +163,6 @@ app.post("/services", async (req, res) => {
   const result = await Services.insertOne(req.body);
   res.send(result);
 });
-
 
 app.put("/services/:id", async (req, res) => {
   const id = req.params.id;
@@ -166,7 +189,7 @@ app.put("/services/:id", async (req, res) => {
    Users appointments
 ======================== */
 
-app.post("/appointment", async (req, res) => {
+app.post("/appointment", verifyJWT, async (req, res) => {
   try {
     const data = req.body;
     const { doctorName, doctorEmail } = data;
@@ -183,10 +206,12 @@ app.post("/appointment", async (req, res) => {
   }
 });
 
-app.get("/appointments", async (req, res) => {
+app.get("/appointments", verifyJWT, async (req, res) => {
   try {
     const { role, email } = req.query;
-
+    if (req.decoded.email !== email) {
+      return res.status(403);
+    }
     let query = {};
 
     if (role === "user") {
@@ -207,7 +232,7 @@ app.get("/appointments", async (req, res) => {
   }
 });
 
-app.delete("/appointment/:id", async (req, res) => {
+app.delete("/appointment/:id", verifyJWT, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -232,7 +257,7 @@ app.delete("/appointment/:id", async (req, res) => {
   }
 });
 
-app.get("/appointment/:id", async (req, res) => {
+app.get("/appointment/:id", verifyJWT, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -254,7 +279,7 @@ app.get("/appointment/:id", async (req, res) => {
    Pay to stripe
 ======================== */
 
-app.post("/create-payment-intent", async (req, res) => {
+app.post("/create-payment-intent", verifyJWT, limiter, async (req, res) => {
   try {
     const { serviceId, customerName, customerEmail } = req.body;
 
@@ -297,7 +322,7 @@ app.post("/create-payment-intent", async (req, res) => {
    Save Payment & Update Appointment
 ==================================== */
 
-app.post("/payments", async (req, res) => {
+app.post("/payments", verifyJWT, limiter, async (req, res) => {
   try {
     const { appointmentId, paymentIntentId, customerEmail, customerName } =
       req.body;
@@ -424,15 +449,11 @@ app.post("/users", async (req, res) => {
   }
 });
 
-app.get("/users/:email", async (req, res) => {
+app.get("/users/:email", verifyJWT, async (req, res) => {
   try {
     const { email } = req.params;
 
     const user = await Users.findOne({ email });
-
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
 
     res.json({
       success: true,
@@ -443,7 +464,7 @@ app.get("/users/:email", async (req, res) => {
   }
 });
 
-app.get("/users", async (req, res) => {
+app.get("/users", verifyJWT, async (req, res) => {
   try {
     const users = await Users.find({}).toArray();
 
@@ -460,7 +481,7 @@ app.get("/users", async (req, res) => {
   }
 });
 
-app.get("/users/check/:email", async (req, res) => {
+app.get("/users/check/:email", verifyJWT, async (req, res) => {
   try {
     const email = req.params.email;
 
@@ -481,7 +502,7 @@ app.get("/users/check/:email", async (req, res) => {
   }
 });
 
-app.patch("/user/:id", async (req, res) => {
+app.patch("/user/:id", verifyJWT, async (req, res) => {
   try {
     const id = req.params.id;
     const { role } = req.body;
@@ -538,7 +559,7 @@ app.get("/doctors-all", async (req, res) => {
   res.send(doctors);
 });
 
-app.post("/doctors-all", async (req, res) => {
+app.post("/doctors-all", verifyJWT, async (req, res) => {
   const doctor = {
     ...req.body,
     permission: "pending",
@@ -549,7 +570,7 @@ app.post("/doctors-all", async (req, res) => {
   res.send(result);
 });
 
-app.patch("/doctors-all/:id", async (req, res) => {
+app.patch("/doctors-all/:id", verifyJWT, async (req, res) => {
   try {
     const id = req.params.id;
     const { permission } = req.body;
@@ -631,7 +652,7 @@ app.get("/reviews/:id", async (req, res) => {
   res.send(review);
 });
 
-app.post("/reviews", async (req, res) => {
+app.post("/reviews", verifyJWT, async (req, res) => {
   const result = await Reviews.insertOne(req.body);
   res.send(result);
 });
@@ -680,9 +701,38 @@ process.on("SIGINT", async () => {
 });
 
 /* ========================
+   Global Error Handler
+======================== */
+
+app.use((err, req, res, next) => {
+  console.error("🔥 Global Error:", err.stack);
+
+  res.status(500).json({
+    success: false,
+    message: "Internal Server Error",
+  });
+});
+
+/* ========================
    Start Server
 ======================== */
 
-app.listen(port, () => {
-  console.log(`🚀 SaaD Dentistry listening on port ${port}`);
-});
+// async function startServer() {
+//   try {
+//     await connectDatabase();
+
+//     app.listen(port, () => {
+//       console.log(`🚀 SaaD Dentistry listening on port ${port}`);
+//     });
+//   } catch (error) {
+//     console.error("Failed to start server:", error);
+//   }
+// }
+
+// startServer();
+module.exports = async (req, res) => {
+  if (!client.topology?.isConnected()) {
+    await connectDatabase();
+  }
+  return app(req, res);
+};
