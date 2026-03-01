@@ -28,11 +28,22 @@ const port = process.env.PORT || 5000;
 
 // app.use(cors());
 
+const allowedOrigins = [
+  "http://localhost:3000",
+  "https://saad-dentistry.vercel.app"
+];
+
 app.use(
   cors({
-    origin: ["http://localhost:5173", "https://saad-dentistry-server.vercel.app"],
+    origin: function (origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
     credentials: true,
-  }),
+  })
 );
 
 app.use(express.json());
