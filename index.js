@@ -30,7 +30,7 @@ const port = process.env.PORT || 5000;
 
 const allowedOrigins = [
   "http://localhost:3000",
-  "https://saad-dentistry.netlify.app"
+  "https://saad-dentistry.netlify.app",
 ];
 
 app.use(
@@ -43,7 +43,7 @@ app.use(
       }
     },
     credentials: true,
-  })
+  }),
 );
 
 app.use(express.json());
@@ -108,23 +108,24 @@ async function connectDatabase() {
    JWT Middleware
 ======================== */
 
-function verifyJWT(req, res, next) {
+const verifyJWT = (req, res, next) => {
   const authHeader = req.headers.authorization;
 
   if (!authHeader) {
-    return res.status(401).send({ message: "Unauthorized access" });
+    return res.status(401).send({ message: "unauthorized access" });
   }
 
   const token = authHeader.split(" ")[1];
 
   jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
     if (err) {
-      return res.status(403).send({ message: "Forbidden access" });
+      return res.status(401).send({ message: "unauthorized access" });
     }
+
     req.decoded = decoded;
     next();
   });
-}
+};
 
 /* ========================
    Routes
