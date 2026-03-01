@@ -465,6 +465,10 @@ app.get("/users/:email", verifyJWT, async (req, res) => {
   try {
     const { email } = req.params;
 
+    if (req.decoded.email !== email) {
+      return res.status(403).send({ message: "forbidden access" });
+    }
+
     const user = await Users.findOne({ email });
 
     res.json({
