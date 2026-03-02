@@ -48,18 +48,6 @@ app.use(
 
 app.use(express.json());
 
-const helmet = require("helmet");
-app.use(helmet());
-
-const rateLimit = require("express-rate-limit");
-
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-});
-
-app.use(limiter);
-
 /* ========================
    Stripe Configuration
 ======================== */
@@ -140,7 +128,7 @@ app.get("/", (req, res) => {
 });
 
 // JWT
-app.post("/jwt", limiter, (req, res) => {
+app.post("/jwt", (req, res) => {
   const { email } = req.body;
   const token = jwt.sign({ email }, process.env.ACCESS_TOKEN_SECRET, {
     expiresIn: "40d",
@@ -291,7 +279,7 @@ app.get("/appointment/:id", verifyJWT, async (req, res) => {
    Pay to stripe
 ======================== */
 
-app.post("/create-payment-intent", verifyJWT, limiter, async (req, res) => {
+app.post("/create-payment-intent", verifyJWT, async (req, res) => {
   try {
     const { serviceId, customerName, customerEmail } = req.body;
 
@@ -334,7 +322,7 @@ app.post("/create-payment-intent", verifyJWT, limiter, async (req, res) => {
    Save Payment & Update Appointment
 ==================================== */
 
-app.post("/payments", verifyJWT, limiter, async (req, res) => {
+app.post("/payments", verifyJWT, async (req, res) => {
   try {
     const { appointmentId, paymentIntentId, customerEmail, customerName } =
       req.body;
