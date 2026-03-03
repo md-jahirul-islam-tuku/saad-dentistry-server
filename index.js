@@ -206,12 +206,9 @@ app.post("/appointment", verifyJWT, async (req, res) => {
   }
 });
 
-app.get("/appointments", verifyJWT, async (req, res) => {
+app.get("/appointments", async (req, res) => {
   try {
     const { role, email } = req.query;
-    if (req.decoded.email !== email) {
-      return res.status(403);
-    }
     let query = {};
 
     if (role === "user") {
@@ -449,13 +446,9 @@ app.post("/users", async (req, res) => {
   }
 });
 
-app.get("/users/:email", verifyJWT, async (req, res) => {
+app.get("/users/:email", async (req, res) => {
   try {
     const { email } = req.params;
-
-    if (req.decoded.email !== email) {
-      return res.status(403).send({ message: "forbidden access" });
-    }
 
     const user = await Users.findOne({ email });
 
@@ -468,7 +461,7 @@ app.get("/users/:email", verifyJWT, async (req, res) => {
   }
 });
 
-app.get("/users", verifyJWT, async (req, res) => {
+app.get("/users", async (req, res) => {
   try {
     const users = await Users.find({}).toArray();
 
