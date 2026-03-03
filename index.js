@@ -708,22 +708,22 @@ app.use((err, req, res, next) => {
    Start Server
 ======================== */
 
-// async function startServer() {
-//   try {
-//     await connectDatabase();
-
-//     app.listen(port, () => {
-//       console.log(`🚀 SaaD Dentistry listening on port ${port}`);
-//     });
-//   } catch (error) {
-//     console.error("Failed to start server:", error);
-//   }
-// }
-
-// startServer();
-module.exports = async (req, res) => {
-  if (!client.topology?.isConnected()) {
+async function startServer() {
+  try {
     await connectDatabase();
+
+    app.listen(port, () => {
+      console.log(`🚀 SaaD Dentistry listening on port ${port}`);
+    });
+  } catch (error) {
+    console.error("Failed to start server:", error);
   }
-  return app(req, res);
-};
+}
+
+startServer();
+// module.exports = async (req, res) => {
+//   if (!client.topology?.isConnected()) {
+//     await connectDatabase();
+//   }
+//   return app(req, res);
+// };
