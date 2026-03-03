@@ -119,9 +119,6 @@ const verifyJWT = (req, res, next) => {
    Routes
 ======================== */
 
-const asyncHandler = (fn) => (req, res, next) =>
-  Promise.resolve(fn(req, res, next)).catch(next);
-
 // Root
 app.get("/", (req, res) => {
   res.send("SaaD Dentistry server is running...");
@@ -140,13 +137,10 @@ app.post("/jwt", (req, res) => {
    Services
 ======================== */
 
-app.get(
-  "/services",
-  asyncHandler(async (req, res) => {
-    const services = await Services.find({}).toArray();
-    res.send(services);
-  }),
-);
+app.get("/services", async (req, res) => {
+  const services = await Services.find({}).toArray();
+  res.send(services);
+});
 
 app.get("/services/:id", async (req, res) => {
   const id = req.params.id;
@@ -714,22 +708,22 @@ app.use((err, req, res, next) => {
    Start Server
 ======================== */
 
-// async function startServer() {
-//   try {
-//     await connectDatabase();
-
-//     app.listen(port, () => {
-//       console.log(`🚀 SaaD Dentistry listening on port ${port}`);
-//     });
-//   } catch (error) {
-//     console.error("Failed to start server:", error);
-//   }
-// }
-
-// startServer();
-module.exports = async (req, res) => {
-  if (!client.topology?.isConnected()) {
+async function startServer() {
+  try {
     await connectDatabase();
+
+    app.listen(port, () => {
+      console.log(`🚀 SaaD Dentistry listening on port ${port}`);
+    });
+  } catch (error) {
+    console.error("Failed to start server:", error);
   }
-  return app(req, res);
-};
+}
+
+startServer();
+// module.exports = async (req, res) => {
+//   if (!client.topology?.isConnected()) {
+//     await connectDatabase();
+//   }
+//   return app(req, res);
+// };
