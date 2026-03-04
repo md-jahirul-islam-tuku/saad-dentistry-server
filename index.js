@@ -183,7 +183,7 @@ app.put("/services/:id", async (req, res) => {
    Users appointments
 ======================== */
 
-app.post("/appointment", verifyJWT, async (req, res) => {
+app.post("/appointment", async (req, res) => {
   try {
     const data = req.body;
     const { doctorName, doctorEmail } = data;
@@ -223,7 +223,7 @@ app.get("/appointments", async (req, res) => {
   }
 });
 
-app.delete("/appointment/:id", verifyJWT, async (req, res) => {
+app.delete("/appointment/:id", async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -248,7 +248,7 @@ app.delete("/appointment/:id", verifyJWT, async (req, res) => {
   }
 });
 
-app.get("/appointment/:id", verifyJWT, async (req, res) => {
+app.get("/appointment/:id", async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -643,12 +643,12 @@ app.get("/reviews/:id", async (req, res) => {
   res.send(review);
 });
 
-app.post("/reviews", verifyJWT, async (req, res) => {
+app.post("/reviews", async (req, res) => {
   const result = await Reviews.insertOne(req.body);
   res.send(result);
 });
 
-app.put("/reviews/:id", verifyJWT, async (req, res) => {
+app.put("/reviews/:id", async (req, res) => {
   const id = req.params.id;
 
   if (!ObjectId.isValid(id)) {
@@ -667,7 +667,7 @@ app.put("/reviews/:id", verifyJWT, async (req, res) => {
   res.send(result);
 });
 
-app.delete("/reviews/:id", verifyJWT, async (req, res) => {
+app.delete("/reviews/:id", async (req, res) => {
   const id = req.params.id;
 
   if (!ObjectId.isValid(id)) {
