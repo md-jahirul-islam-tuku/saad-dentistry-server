@@ -625,6 +625,11 @@ app.get("/reviews", verifyJWT, async (req, res) => {
   res.send(reviews);
 });
 
+app.get("/reviews-all", async (req, res) => {
+  const reviews = await Reviews.find().toArray();
+  res.send(reviews);
+});
+
 app.get("/review", async (req, res) => {
   const query = req.query.service ? { service: req.query.service } : {};
 
