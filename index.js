@@ -270,7 +270,7 @@ app.get("/appointment/:id", async (req, res) => {
    Pay to stripe
 ======================== */
 
-app.post("/create-payment-intent", verifyJWT, async (req, res) => {
+app.post("/create-payment-intent", async (req, res) => {
   try {
     const { serviceId, customerName, customerEmail } = req.body;
 
@@ -313,7 +313,7 @@ app.post("/create-payment-intent", verifyJWT, async (req, res) => {
    Save Payment & Update Appointment
 ==================================== */
 
-app.post("/payments", verifyJWT, async (req, res) => {
+app.post("/payments", async (req, res) => {
   try {
     const { appointmentId, paymentIntentId, customerEmail, customerName } =
       req.body;
@@ -493,7 +493,7 @@ app.get("/users/check/:email", verifyJWT, async (req, res) => {
   }
 });
 
-app.patch("/user/:id", verifyJWT, async (req, res) => {
+app.patch("/user/:id", async (req, res) => {
   try {
     const id = req.params.id;
     const { role } = req.body;
@@ -527,7 +527,7 @@ app.patch("/user/:id", verifyJWT, async (req, res) => {
   }
 });
 
-app.delete("/user/:id", verifyJWT, async (req, res) => {
+app.delete("/user/:id", async (req, res) => {
   const id = req.params.id;
 
   if (!ObjectId.isValid(id)) {
@@ -550,7 +550,7 @@ app.get("/doctors-all", async (req, res) => {
   res.send(doctors);
 });
 
-app.post("/doctors-all", verifyJWT, async (req, res) => {
+app.post("/doctors-all", async (req, res) => {
   const doctor = {
     ...req.body,
     permission: "pending",
