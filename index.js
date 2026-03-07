@@ -115,6 +115,17 @@ const verifyJWT = (req, res, next) => {
   });
 };
 
+const verifyAdmin = async (req, res, next) => {
+  const email = req.decoded.email;
+  const user = await Users.findOne({ email });
+
+  if (user.role !== "admin") {
+    return res.status(403).send({ message: "Forbidden" });
+  }
+
+  next();
+};
+
 /* ========================
    Routes
 ======================== */
@@ -472,7 +483,7 @@ app.get("/users", async (req, res) => {
   }
 });
 
-app.get("/users/check/:email", verifyJWT, async (req, res) => {
+app.get("/users/check/:email", async (req, res) => {
   try {
     const email = req.params.email;
 
@@ -625,7 +636,15 @@ app.get("/reviews", verifyJWT, async (req, res) => {
   res.send(reviews);
 });
 
-app.get("/reviews-all", async (req, res) => {
+app.get("/reviews-all", verifyJWT, verifyAdmin, async (req, res) => {
+  const decoded = req.decoded;
+
+  const user = await Users.findOne({ email: decoded.email });
+
+  if (user.role !== "admin") {
+    return res.status(403).send({ message: "Admins only" });
+  }
+
   const reviews = await Reviews.find().toArray();
   res.send(reviews);
 });
