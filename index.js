@@ -561,7 +561,7 @@ app.post("/doctors-all", async (req, res) => {
   res.send(result);
 });
 
-app.patch("/doctors-all/:id", verifyJWT, async (req, res) => {
+app.patch("/doctors-all/:id", async (req, res) => {
   try {
     const id = req.params.id;
     const { permission } = req.body;
