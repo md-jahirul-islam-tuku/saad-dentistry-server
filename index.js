@@ -149,8 +149,21 @@ app.post("/jwt", (req, res) => {
 ======================== */
 
 app.get("/services", async (req, res) => {
-  const services = await Services.find({}).toArray();
-  res.send(services);
+  try {
+    const services = await Services.find({}).toArray();
+    res.send(services);
+  } catch (error) {
+    res.status(500).send({ message: error.message });
+  }
+});
+
+app.get("/services-home", async (req, res) => {
+  try {
+    const services = await Services.find({}).limit(3).toArray();
+    res.send(services);
+  } catch (error) {
+    res.status(500).send({ message: error.message });
+  }
 });
 
 app.get("/services/:id", async (req, res) => {
