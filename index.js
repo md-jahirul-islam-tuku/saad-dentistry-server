@@ -177,12 +177,12 @@ app.get("/services/:id", async (req, res) => {
   res.send(service);
 });
 
-app.post("/services", async (req, res) => {
+app.post("/services", verifyJWT, verifyAdmin, async (req, res) => {
   const result = await Services.insertOne(req.body);
   res.send(result);
 });
 
-app.put("/services/:id", async (req, res) => {
+app.put("/services/:id", verifyJWT, verifyAdmin, async (req, res) => {
   const id = req.params.id;
   const updatedData = req.body;
 
@@ -207,7 +207,7 @@ app.put("/services/:id", async (req, res) => {
    Users appointments
 ======================== */
 
-app.post("/appointment", async (req, res) => {
+app.post("/appointment", verifyJWT, async (req, res) => {
   try {
     const data = req.body;
     const { doctorName, doctorEmail } = data;
@@ -224,7 +224,7 @@ app.post("/appointment", async (req, res) => {
   }
 });
 
-app.get("/appointments", async (req, res) => {
+app.get("/appointments", verifyJWT, async (req, res) => {
   try {
     const { role, email } = req.query;
     let query = {};
@@ -247,7 +247,7 @@ app.get("/appointments", async (req, res) => {
   }
 });
 
-app.delete("/appointment/:id", async (req, res) => {
+app.delete("/appointment/:id", verifyJWT, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -272,7 +272,7 @@ app.delete("/appointment/:id", async (req, res) => {
   }
 });
 
-app.get("/appointment/:id", async (req, res) => {
+app.get("/appointment/:id", verifyJWT, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -294,7 +294,7 @@ app.get("/appointment/:id", async (req, res) => {
    Pay to stripe
 ======================== */
 
-app.post("/create-payment-intent", async (req, res) => {
+app.post("/create-payment-intent", verifyJWT, async (req, res) => {
   try {
     const { serviceId, customerName, customerEmail } = req.body;
 
@@ -337,7 +337,7 @@ app.post("/create-payment-intent", async (req, res) => {
    Save Payment & Update Appointment
 ==================================== */
 
-app.post("/payments", async (req, res) => {
+app.post("/payments", verifyJWT, async (req, res) => {
   try {
     const { appointmentId, paymentIntentId, customerEmail, customerName } =
       req.body;
@@ -464,7 +464,7 @@ app.post("/users", async (req, res) => {
   }
 });
 
-app.get("/users/:email", async (req, res) => {
+app.get("/users/:email", verifyJWT, async (req, res) => {
   try {
     const { email } = req.params;
 
@@ -479,7 +479,7 @@ app.get("/users/:email", async (req, res) => {
   }
 });
 
-app.get("/users", async (req, res) => {
+app.get("/users", verifyJWT, verifyAdmin, async (req, res) => {
   try {
     const users = await Users.find({}).toArray();
 
@@ -517,7 +517,7 @@ app.get("/users/check/:email", async (req, res) => {
   }
 });
 
-app.patch("/user/:id", async (req, res) => {
+app.patch("/user/:id", verifyJWT, verifyAdmin, async (req, res) => {
   try {
     const id = req.params.id;
     const { role } = req.body;
@@ -551,7 +551,7 @@ app.patch("/user/:id", async (req, res) => {
   }
 });
 
-app.delete("/user/:id", async (req, res) => {
+app.delete("/user/:id", verifyJWT, verifyAdmin, async (req, res) => {
   const id = req.params.id;
 
   if (!ObjectId.isValid(id)) {
@@ -574,7 +574,7 @@ app.get("/doctors-all", async (req, res) => {
   res.send(doctors);
 });
 
-app.post("/doctors-all", async (req, res) => {
+app.post("/doctors-all", verifyJWT, async (req, res) => {
   const doctor = {
     ...req.body,
     permission: "pending",
@@ -585,7 +585,7 @@ app.post("/doctors-all", async (req, res) => {
   res.send(result);
 });
 
-app.patch("/doctors-all/:id", async (req, res) => {
+app.patch("/doctors-all/:id", verifyJWT, verifyAdmin, async (req, res) => {
   try {
     const id = req.params.id;
     const { permission } = req.body;
@@ -662,14 +662,14 @@ app.get("/reviews-all", verifyJWT, verifyAdmin, async (req, res) => {
   res.send(reviews);
 });
 
-app.get("/review", async (req, res) => {
+app.get("/review", verifyJWT, async (req, res) => {
   const query = req.query.service ? { service: req.query.service } : {};
 
   const reviews = await Reviews.find(query).toArray();
   res.send(reviews);
 });
 
-app.get("/reviews/:id", async (req, res) => {
+app.get("/reviews/:id", verifyJWT, async (req, res) => {
   const id = req.params.id;
 
   if (!ObjectId.isValid(id)) {
@@ -680,12 +680,12 @@ app.get("/reviews/:id", async (req, res) => {
   res.send(review);
 });
 
-app.post("/reviews", async (req, res) => {
+app.post("/reviews", verifyJWT, async (req, res) => {
   const result = await Reviews.insertOne(req.body);
   res.send(result);
 });
 
-app.put("/reviews/:id", async (req, res) => {
+app.put("/reviews/:id", verifyJWT, async (req, res) => {
   const id = req.params.id;
 
   if (!ObjectId.isValid(id)) {
@@ -704,7 +704,7 @@ app.put("/reviews/:id", async (req, res) => {
   res.send(result);
 });
 
-app.delete("/reviews/:id", async (req, res) => {
+app.delete("/reviews/:id", verifyJWT, async (req, res) => {
   const id = req.params.id;
 
   if (!ObjectId.isValid(id)) {
@@ -745,22 +745,22 @@ app.use((err, req, res, next) => {
    Start Server
 ======================== */
 
-// async function startServer() {
-//   try {
-//     await connectDatabase();
-
-//     app.listen(port, () => {
-//       console.log(`🚀 SaaD Dentistry listening on port ${port}`);
-//     });
-//   } catch (error) {
-//     console.error("Failed to start server:", error);
-//   }
-// }
-
-// startServer();
-module.exports = async (req, res) => {
-  if (!client.topology?.isConnected()) {
+async function startServer() {
+  try {
     await connectDatabase();
+
+    app.listen(port, () => {
+      console.log(`🚀 SaaD Dentistry listening on port ${port}`);
+    });
+  } catch (error) {
+    console.error("Failed to start server:", error);
   }
-  return app(req, res);
-};
+}
+
+startServer();
+// module.exports = async (req, res) => {
+//   if (!client.topology?.isConnected()) {
+//     await connectDatabase();
+//   }
+//   return app(req, res);
+// };
