@@ -119,8 +119,20 @@ const verifyAdmin = async (req, res, next) => {
   const email = req.decoded.email;
   const user = await Users.findOne({ email });
 
-  if (user.role !== "admin") {
+  if (user.role !== "admin" && user.role !== "super-admin") {
     return res.status(403).send({ message: "Forbidden" });
+  }
+
+  next();
+};
+
+const verifySuperAdmin = async (req, res, next) => {
+  const email = req.decoded.email;
+
+  const user = await Users.findOne({ email });
+
+  if (user.role !== "super-admin") {
+    return res.status(403).send({ message: "Super admin only" });
   }
 
   next();
@@ -517,53 +529,65 @@ app.get("/users/check/:email", async (req, res) => {
   }
 });
 
-app.patch("/user/:id", verifyJWT, verifyAdmin, async (req, res) => {
-  try {
+app.patch(
+  "/user/:id",
+  verifyJWT,
+  verifyAdmin,
+  verifySuperAdmin,
+  async (req, res) => {
+    try {
+      const id = req.params.id;
+      const { role } = req.body;
+      if (!ObjectId.isValid(id)) {
+        return res.status(400).send({ error: "Invalid ID" });
+      }
+      const user = await Users.findOne({ _id: new ObjectId(id) });
+      if (user.role === "admin" && role !== "admin") {
+        const adminCount = await Users.countDocuments({
+          role: "admin",
+        });
+        if (adminCount <= 1) {
+          return res.status(400).send({
+            error: "At least one admin must remain in the system",
+          });
+        }
+      }
+      const userUpdate = await Users.updateOne(
+        { _id: new ObjectId(id) },
+        {
+          $set: { role },
+        },
+      );
+      res.send({
+        modifiedCount: userUpdate.modifiedCount,
+        message: "Role updated successfully",
+      });
+    } catch (error) {
+      console.error("Update Error:", error);
+      res.status(500).send({ error: "Server Error" });
+    }
+  },
+);
+
+app.delete(
+  "/user/:id",
+  verifyJWT,
+  verifyAdmin,
+  verifySuperAdmin,
+  async (req, res) => {
     const id = req.params.id;
-    const { role } = req.body;
+
     if (!ObjectId.isValid(id)) {
       return res.status(400).send({ error: "Invalid ID" });
     }
-    const user = await Users.findOne({ _id: new ObjectId(id) });
-    if (user.role === "admin" && role !== "admin") {
-      const adminCount = await Users.countDocuments({
-        role: "admin",
-      });
-      if (adminCount <= 1) {
-        return res.status(400).send({
-          error: "At least one admin must remain in the system",
-        });
-      }
-    }
-    const userUpdate = await Users.updateOne(
-      { _id: new ObjectId(id) },
-      {
-        $set: { role },
-      },
-    );
-    res.send({
-      modifiedCount: userUpdate.modifiedCount,
-      message: "Role updated successfully",
+
+    const result = await Users.deleteOne({
+      _id: new ObjectId(id),
     });
-  } catch (error) {
-    console.error("Update Error:", error);
-    res.status(500).send({ error: "Server Error" });
-  }
-});
 
-app.delete("/user/:id", verifyJWT, verifyAdmin, async (req, res) => {
-  const id = req.params.id;
-
-  if (!ObjectId.isValid(id)) {
-    return res.status(400).send({ error: "Invalid ID" });
-  }
-
-  const result = await Users.deleteOne({
-    _id: new ObjectId(id),
-  });
-
-  res.send(result);
-});
+    res.send(result);
+  },
+);
 
 /* ========================
    Doctors (doctors-all)
