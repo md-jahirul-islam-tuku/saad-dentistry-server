@@ -623,6 +623,22 @@ app.get("/doctors-all", async (req, res) => {
   res.send(doctors);
 });
 
+app.get("/doctor-by-email/:email", async (req, res) => {
+  const email = req.params.email;
+
+  try {
+    const doctor = await Doctors.findOne({ email });
+
+    if (!doctor) {
+      return res.status(404).json({ error: "Doctor not found" });
+    }
+
+    res.json(doctor);
+  } catch (err) {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
 app.post("/doctors-all", verifyJWT, async (req, res) => {
   const doctor = {
     ...req.body,
@@ -678,6 +694,72 @@ app.patch("/doctors-all/:id", verifyJWT, verifyAdmin, async (req, res) => {
   } catch (error) {
     console.error("Update Error:", error);
     res.status(500).send({ error: "Server Error" });
+  }
+});
+
+app.put("/doctors-all/:id", async (req, res) => {
+  const id = req.params.id;
+
+  if (!ObjectId.isValid(id)) {
+    return res.status(400).send({ error: "Invalid ID" });
+  }
+  const updatedDoctor = {
+    $set: {
+      doctorImage: req.body.doctorImage,
+      name: req.body.name,
+      education: req.body.education,
+      registrationNumber: req.body.registrationNumber,
+      specialty: req.body.specialty,
+      workingAt: req.body.workingAt,
+      experience: req.body.experience,
+      fee: req.body.fee,
+      availability: req.body.availability,
+    },
+  };
+
+  const result = await Doctors.updateOne(
+    { _id: new ObjectId(id) },
+    updatedDoctor,
+  );
+
+  res.send(result);
+});
+
+app.put("/update-profile", async (req, res) => {
+  const { email, name, photoURL } = req.body;
+
+  const filter = { email };
+
+  const updateDoctor = {
+    $set: {
+      name,
+      doctorImage: photoURL,
+    },
+  };
+  const updateReview = {
+    $set: {
+      name,
+      image: photoURL,
+    },
+  };
+  const updateUser = {
+    $set: {
+      name,
+      photoURL,
+    },
+  };
+
+  try {
+    await Users.updateOne(filter, updateUser);
+    await Doctors.updateOne(filter, updateDoctor);
+    await Reviews.updateMany(filter, updateReview);
+
+    res.send({
+      success: true,
+      message: "Profile updated everywhere",
+    });
+  } catch (err) {
+    res.status(500).send({ error: "Update failed" });
   }
 });
 
@@ -794,22 +876,22 @@ app.use((err, req, res, next) => {
    Start Server
 ======================== */
 
-// async function startServer() {
-//   try {
-//     await connectDatabase();
-
-//     app.listen(port, () => {
-//       console.log(`🚀 SaaD Dentistry listening on port ${port}`);
-//     });
-//   } catch (error) {
-//     console.error("Failed to start server:", error);
-//   }
-// }
-
-// startServer();
-module.exports = async (req, res) => {
-  if (!client.topology?.isConnected()) {
+async function startServer() {
+  try {
     await connectDatabase();
+
+    app.listen(port, () => {
+      console.log(`🚀 SaaD Dentistry listening on port ${port}`);
+    });
+  } catch (error) {
+    console.error("Failed to start server:", error);
   }
-  return app(req, res);
-};
+}
+
+startServer();
+// module.exports = async (req, res) => {
+//   if (!client.topology?.isConnected()) {
+//     await connectDatabase();
+//   }
+//   return app(req, res);
+// };
