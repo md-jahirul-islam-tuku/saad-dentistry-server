@@ -215,6 +215,31 @@ app.put("/services/:id", verifyJWT, verifyAdmin, async (req, res) => {
   res.send(result);
 });
 
+app.delete("/services/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await Services.deleteOne({ _id: new ObjectId(id) });
+
+    if (result.deletedCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Service not found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Service deleted successfully",
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
+});
+
 /* ========================
    Users appointments
 ======================== */
